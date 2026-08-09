@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.sky.mapper.DishMapper">
+
+<!--    插入菜品-->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id"> <!-- 返回菜品id,用于口味id的赋值 -->
+        insert into dish (name, category_id, price, image, description, status,create_time, update_time, create_user, update_user)
+            VALUES (#{name}, #{categoryId}, #{price}, #{image}, #{description}, #{status},
+                #{createTime}, #{updateTime}, #{createUser}, #{updateUser})
+    </insert>
+
+    <!--    菜品分页条件查询-->
+    <select id="pageQuery" resultType="com.sky.vo.DishVO">
+        select d.*, c.name categoryName from dish d left join category c on d.category_id = c.id
+        <where>
+            <if test="name != null and name != ''">d.name like concat('%',#{name},'%')</if>
+            <if test="categoryId != null">and d.category_id = #{categoryId}</if>
+            <if test="status != null">and d.status = #{status}</if>
+        </where>
+        order by d.update_time desc
+    </select>
+
+<!--    删除操作中的 :-->
+<!--    批量删除菜品根据id-->
+    <delete id="deleteByIds">
+        delete from dish where id in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+<!--    动态修改菜品基本信息-->
+    <update id="update">
+        update dish
+        <set>
+            <if test="name != null and name != ''">name = #{name},</if>
+            <if test="categoryId != null">category_id = #{categoryId},</if>
+            <if test="image != null and image != ''">image = #{image},</if>
+            <if test="description != null and description != ''">description = #{description},</if>
+            <if test="price != null">price = #{price}</if>
+        </set>
+        where id = #{id}
+    </update>
+
+<!--    新增套餐操作中:
+        根据分类id查询菜品-->
+    <select id="getBycategoryId" resultType="com.sky.entity.Dish">
+        select * from dish
+        <where>
+            <if test="name != null and name != ''">name like concat('%',#{name},'%')</if>
+            <if test="categoryId != null">and category_id = #{categoryId}</if>
+            <if test="status != null">and status = #{status}</if>
+        </where>
+        order by create_time desc
+    </select>
+</mapper>
