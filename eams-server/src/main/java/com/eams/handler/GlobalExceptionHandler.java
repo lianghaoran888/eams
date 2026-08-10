@@ -1,0 +1,49 @@
+package com.eams.handler;
+
+import com.eams.constant.MessageConstant;
+import com.eams.exception.BaseException;
+import com.eams.result.Result;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.sql.SQLIntegrityConstraintViolationException;
+
+/**
+ * 全局异常处理器，处理项目中抛出的业务异常
+ */
+@RestControllerAdvice
+@Slf4j
+public class GlobalExceptionHandler {
+
+    /**
+     * 捕获业务异常
+     * @param ex
+     * @return
+     */
+    @ExceptionHandler
+    public Result exceptionHandler(BaseException ex){
+        log.error("异常信息：{}", ex.getMessage());
+        return Result.error(ex.getMessage());
+    }
+
+    /**
+     * 处理SQL异常
+     * @param ex
+     */
+    @ExceptionHandler
+    public Result exceptionHandler(SQLIntegrityConstraintViolationException ex){
+        // Duplicate entry 'lianghaorna' for key 'employee.idx_username'
+        log.info("异常信息: {}", ex.getMessage());
+        String message = ex.getMessage();
+        if(message.contains("Duplicate entry")){
+            String[] split = message.split(" ");
+            String username = split[2];
+            String msg = username + MessageConstant.ALREADY_EXISTS;
+            return Result.error(msg);
+        }else{
+            return Result.error(MessageConstant.UNKNOWN_ERROR);
+        }
+    }
+
+}

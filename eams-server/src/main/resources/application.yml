@@ -1,0 +1,61 @@
+server:
+  port: 8080
+
+spring:
+  profiles:
+    active: dev
+  main:
+    allow-circular-references: true
+  datasource:
+    druid:
+      driver-class-name: ${eams.datasource.driver-class-name}
+      url: jdbc:mysql://${eams.datasource.host}:${eams.datasource.port}/${eams.datasource.database}?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
+      username: ${eams.datasource.username}
+      password: ${eams.datasource.password}
+  data:
+    redis:
+      host: ${eams.redis.host}
+      port: ${eams.redis.port}
+      password: ${eams.redis.password}
+      database: ${eams.redis.database}
+  ai:
+    openai:
+      # OpenAI 兼容接口配置（DeepSeek / Ollama / 通义千问等），可通过环境变量覆盖：
+      #   SKY_AI_BASE_URL: 接口地址，如 https://api.deepseek.com 或 http://localhost:11434/v1
+      #   SKY_AI_API_KEY : API Key（本地 Ollama 可填任意值）
+      #   SKY_AI_MODEL   : 模型名，如 deepseek-chat / gpt-4o-mini / qwen-vl-max
+      base-url: ${eams.openai.base-url}
+      api-key: ${eams.openai.api-key}
+      chat:
+        model: ${eams.openai.chat.model}
+        temperature: 0.2
+
+mybatis:
+  #mapper配置文件
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.eams.entity
+  configuration:
+    #开启驼峰命名
+    map-underscore-to-camel-case: true
+
+logging:
+  level:
+    com:
+      sky:
+        mapper: debug
+        service: info
+        controller: info
+
+sky:
+  jwt:
+    # 设置jwt签名加密时使用的秘钥
+    secret-key: eams-asset-management-secret-key-2026-0710
+    # 设置jwt过期时间（毫秒）：7天，与Redis中token缓存过期时间一致
+    ttl: 604800000
+    # 设置前端传递过来的令牌名称
+    token-name: token
+  alioss:
+    endpoint: ${eams.alioss.endpoint}
+    access-key-id: ${eams.alioss.access-key-id}
+    access-key-secret: ${eams.alioss.access-key-secret}
+    bucket-name: ${eams.alioss.bucket-name}
