@@ -2,91 +2,137 @@ package com.sky.service.impl;
 
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
+import com.sky.constant.JwtClaimsConstant;
 import com.sky.constant.MessageConstant;
 import com.sky.constant.PasswordConstant;
+import com.sky.constant.RedisConstant;
+import com.sky.constant.RoleConstant;
 import com.sky.constant.StatusConstant;
 import com.sky.context.BaseContext;
 import com.sky.dto.EmployeeDTO;
 import com.sky.dto.EmployeeLoginDTO;
 import com.sky.dto.EmployeePageQueryDTO;
+import com.sky.dto.PasswordEditDTO;
 import com.sky.entity.Employee;
 import com.sky.exception.AccountLockedException;
 import com.sky.exception.AccountNotFoundException;
 import com.sky.exception.PasswordErrorException;
 import com.sky.mapper.EmployeeMapper;
+import com.sky.properties.JwtProperties;
 import com.sky.result.PageResult;
 import com.sky.service.EmployeeService;
+import com.sky.utils.JwtUtil;
+import com.sky.vo.EmployeeLoginVO;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
-import javax.swing.text.Utilities;
-import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @Service
+@Slf4j
 public class EmployeeServiceImpl implements EmployeeService {
 
     @Autowired
     private EmployeeMapper employeeMapper;
 
+    @Autowired
+    private JwtProperties jwtProperties;
+
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
+
     /**
-     * 员工登录
+     * 员工登录：支持用户名（管理端）或手机号（H5 端）+ 密码
+     * 登录成功后生成 JWT，并将 token 写入 Redis（7 天过期）
      */
-    public Employee login(EmployeeLoginDTO employeeLoginDTO) {
-        String username = employeeLoginDTO.getUsername();
+    @Override
+    public EmployeeLoginVO login(EmployeeLoginDTO employeeLoginDTO) {
         String password = employeeLoginDTO.getPassword();
+        Employee employee;
 
-        //1、根据用户名查询数据库中的数据
-        Employee employee = employeeMapper.getByUsername(username);
-
-        //2、处理各种异常情况（用户名不存在、密码不对、账号被锁定）
-        if (employee == null) {
-            //账号不存在
+        if (employeeLoginDTO.getUsername() != null && !employeeLoginDTO.getUsername().isEmpty()) {
+            employee = employeeMapper.getByUsername(employeeLoginDTO.getUsername());
+        } else if (employeeLoginDTO.getPhone() != null && !employeeLoginDTO.getPhone().isEmpty()) {
+            employee = employeeMapper.getByPhone(employeeLoginDTO.getPhone());
+        } else {
             throw new AccountNotFoundException(MessageConstant.ACCOUNT_NOT_FOUND);
         }
 
-        //密码比对
-        // 将密码的明文用md5加密成密文
+        if (employee == null) {
+            throw new AccountNotFoundException(MessageConstant.ACCOUNT_NOT_FOUND);
+        }
+
+        // 密码比对（MD5）
         password = DigestUtils.md5DigestAsHex(password.getBytes());
         if (!password.equals(employee.getPassword())) {
-            //密码错误
             throw new PasswordErrorException(MessageConstant.PASSWORD_ERROR);
         }
 
         if (employee.getStatus() == StatusConstant.DISABLE) {
-            //账号被锁定
             throw new AccountLockedException(MessageConstant.ACCOUNT_LOCKED);
         }
 
-        //3、返回实体对象
-        return employee;
+        // 生成 JWT（claims 中携带角色/部门，便于拦截器做权限校验）
+        Map<String, Object> claims = new HashMap<>();
+        claims.put(JwtClaimsConstant.EMP_ID, employee.getId());
+        claims.put(JwtClaimsConstant.ROLE, employee.getRole());
+        claims.put(JwtClaimsConstant.DEPARTMENT, employee.getDepartment());
+        claims.put(JwtClaimsConstant.NAME, employee.getName());
+        claims.put(JwtClaimsConstant.USERNAME, employee.getUsername());
+        claims.put(JwtClaimsConstant.PHONE, employee.getPhone());
+        String token = JwtUtil.createJWT(jwtProperties.getSecretKey(), jwtProperties.getTtl(), claims);
+
+        // 登录态写入 Redis，7 天过期
+        stringRedisTemplate.opsForValue().set(
+                RedisConstant.LOGIN_TOKEN_KEY + employee.getId(),
+                token,
+                RedisConstant.LOGIN_TOKEN_TTL,
+                TimeUnit.SECONDS);
+
+        return EmployeeLoginVO.builder()
+                .id(employee.getId())
+                .userName(employee.getUsername())
+                .name(employee.getName())
+                .phone(employee.getPhone())
+                .role(employee.getRole())
+                .department(employee.getDepartment())
+                .token(token)
+                .build();
+    }
+
+    /**
+     * 退出登录：删除 Redis 中的 token
+     */
+    @Override
+    public void logout() {
+        Long currentId = BaseContext.getCurrentId();
+        if (currentId != null) {
+            stringRedisTemplate.delete(RedisConstant.LOGIN_TOKEN_KEY + currentId);
+            log.info("员工退出登录, empId={}", currentId);
+        }
+        BaseContext.removeCurrentId();
     }
 
     /**
      * 新增员工
      */
     @Override
-    public void add(EmployeeDTO employeeDTO) { // 实现操作时,再用实体类
+    public void add(EmployeeDTO employeeDTO) {
         Employee employee = new Employee();
+        BeanUtils.copyProperties(employeeDTO, employee);
 
-        // 属性拷贝 : 把employeeDTO的属性拷贝到employee的部分属性
-        BeanUtils.copyProperties(employeeDTO,employee);
-
-        // 再搞剩下的属性
-        // employee.setCreateTime(LocalDateTime.now());
-        // employee.setUpdateTime(LocalDateTime.now());
-
-        employee.setPassword(DigestUtils.md5DigestAsHex(PasswordConstant.DEFAULT_PASSWORD.getBytes())); // PasswordConstant : 密码常量类
-
-        employee.setStatus(StatusConstant.ENABLE);// StatusConstant : 状态常量类
-
-        // 设置当前创建人id和修改人id
-        // 把ThreadLocal存储的当前员工的ID,获取到
-        // employee.setCreateUser(BaseContext.getCurrentId());
-        // employee.setUpdateUser(BaseContext.getCurrentId());
-
+        employee.setPassword(DigestUtils.md5DigestAsHex(PasswordConstant.DEFAULT_PASSWORD.getBytes()));
+        employee.setStatus(StatusConstant.ENABLE);
+        if (employee.getRole() == null) {
+            employee.setRole(RoleConstant.EMPLOYEE);
+        }
         employeeMapper.insert(employee);
     }
 
@@ -95,14 +141,10 @@ public class EmployeeServiceImpl implements EmployeeService {
      */
     @Override
     public PageResult page(EmployeePageQueryDTO employeePageQueryDTO) {
-        // 开始分页查询
         PageHelper.startPage(employeePageQueryDTO.getPage(), employeePageQueryDTO.getPageSize());
-
         Page<Employee> employeePage = employeeMapper.pageQuery(employeePageQueryDTO);
-
         long total = employeePage.getTotal();
         List<Employee> records = employeePage.getResult();
-
         return new PageResult(total, records);
     }
 
@@ -111,26 +153,23 @@ public class EmployeeServiceImpl implements EmployeeService {
      */
     @Override
     public void startOrStop(Integer status, Long id) {
-        // update employee set status = ? where id = ?
-        // 把status,id封装到实体类Employee中, 顺便把修改时间和修改人id封装
-        Employee employee = Employee.builder() // 构建器模式
+        Employee employee = Employee.builder()
                 .status(status)
                 .id(id)
-                // .updateTime(LocalDateTime.now())
-                // .updateUser(BaseContext.getCurrentId())
                 .build();
         employeeMapper.update(employee);
     }
 
     /**
-     * 根据ID查询员工信息(查询回显)
+     * 根据 ID 查询员工信息（密码脱敏）
      */
     @Override
     public Employee queryById(Long id) {
-       // select * from employee where id = ?
-       Employee employee = employeeMapper.queryById(id);
-       employee.setPassword("****");
-       return employee;
+        Employee employee = employeeMapper.getById(id);
+        if (employee != null) {
+            employee.setPassword("****");
+        }
+        return employee;
     }
 
     /**
@@ -139,16 +178,32 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     public void update(EmployeeDTO employeeDTO) {
         Employee employee = new Employee();
-
-        // 属性拷贝
         BeanUtils.copyProperties(employeeDTO, employee);
-
-        //  再赋值其他的属性
-        // employee.setUpdateTime(LocalDateTime.now());
-
-        // employee.setUpdateUser(BaseContext.getCurrentId());
-
         employeeMapper.update(employee);
     }
 
+    /**
+     * 修改密码
+     */
+    @Override
+    public void editPassword(PasswordEditDTO passwordEditDTO) {
+        Long empId = passwordEditDTO.getEmpId() != null
+                ? passwordEditDTO.getEmpId()
+                : BaseContext.getCurrentId();
+        Employee employee = employeeMapper.getById(empId);
+        if (employee == null) {
+            throw new AccountNotFoundException(MessageConstant.ACCOUNT_NOT_FOUND);
+        }
+
+        String oldPassword = DigestUtils.md5DigestAsHex(passwordEditDTO.getOldPassword().getBytes());
+        if (!oldPassword.equals(employee.getPassword())) {
+            throw new PasswordErrorException(MessageConstant.OLD_PASSWORD_ERROR);
+        }
+
+        Employee update = Employee.builder()
+                .id(empId)
+                .password(DigestUtils.md5DigestAsHex(passwordEditDTO.getNewPassword().getBytes()))
+                .build();
+        employeeMapper.update(update);
+    }
 }

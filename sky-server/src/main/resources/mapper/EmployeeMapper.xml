@@ -9,11 +9,14 @@
             <if test="name != null and name != ''">
                 name like concat('%', #{name},'%')
             </if>
+            <if test="department != null and department != ''">
+                and department like concat('%', #{department},'%')
+            </if>
         </where>
         order by update_time desc
     </select>
 
-<!--    启用/禁用员工状态--><!-- 编辑员工信息 -->
+<!--    启用/禁用员工状态 / 编辑员工信息 -->
     <update id="update" parameterType="com.sky.entity.Employee">
         update employee
         <set>
@@ -24,7 +27,8 @@
             <if test="phone != null and phone != ''">phone = #{phone},</if>
             <if test="idNumber != null and idNumber != ''">id_number = #{idNumber},</if>
             <if test="status != null">status = #{status},</if>
-            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="role != null">role = #{role},</if>
+            <if test="department != null and department != ''">department = #{department},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>
             <if test="updateUser != null">update_user = #{updateUser}</if>
         </set>

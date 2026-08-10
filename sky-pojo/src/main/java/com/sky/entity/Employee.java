@@ -8,8 +8,11 @@ import lombok.NoArgsConstructor;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
+/**
+ * 员工
+ */
 @Data
-@Builder // 构建器模式
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class Employee implements Serializable {
@@ -22,6 +25,7 @@ public class Employee implements Serializable {
 
     private String name;
 
+    /** 手机号（员工 H5 端登录账号，唯一） */
     private String phone;
 
     private String sex;
@@ -30,12 +34,17 @@ public class Employee implements Serializable {
 
     private String password;
 
+    /** 状态：1启用 0禁用 */
     private Integer status;
 
-    //@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    /** 角色：0员工 1管理员 */
+    private Integer role;
+
+    /** 部门 */
+    private String department;
+
     private LocalDateTime createTime;
 
-    //@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updateTime;
 
     private Long createUser;

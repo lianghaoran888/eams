@@ -1,19 +1,21 @@
 package com.sky.dto;
 
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.io.Serializable;
 
+/**
+ * 员工登录参数：支持手机号+密码（H5端）或用户名+密码（管理端）
+ */
 @Data
-@ApiModel(description = "员工登录时传递的数据模型")
 public class EmployeeLoginDTO implements Serializable {
 
-    @ApiModelProperty("用户名")
+    /** 用户名（管理端登录使用） */
     private String username;
 
-    @ApiModelProperty("密码")
-    private String password;
+    /** 手机号（员工 H5 端登录使用） */
+    private String phone;
 
+    /** 密码 */
+    private String password;
 }
