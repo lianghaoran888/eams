@@ -28,6 +28,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.DigestUtils;
 
 import java.util.HashMap;
@@ -53,6 +54,7 @@ public class EmployeeServiceImpl implements EmployeeService {
      * 登录成功后生成 JWT，并将 token 写入 Redis（7 天过期）
      */
     @Override
+    @Transactional
     public EmployeeLoginVO login(EmployeeLoginDTO employeeLoginDTO) {
         String password = employeeLoginDTO.getPassword();
         Employee employee;
@@ -187,9 +189,7 @@ public class EmployeeServiceImpl implements EmployeeService {
      */
     @Override
     public void editPassword(PasswordEditDTO passwordEditDTO) {
-        Long empId = passwordEditDTO.getEmpId() != null
-                ? passwordEditDTO.getEmpId()
-                : BaseContext.getCurrentId();
+        Long empId = passwordEditDTO.getEmpId() != null ? passwordEditDTO.getEmpId() : BaseContext.getCurrentId();
         Employee employee = employeeMapper.getById(empId);
         if (employee == null) {
             throw new AccountNotFoundException(MessageConstant.ACCOUNT_NOT_FOUND);

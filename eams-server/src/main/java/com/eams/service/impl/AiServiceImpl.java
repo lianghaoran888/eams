@@ -85,7 +85,7 @@ public class AiServiceImpl implements AiService {
 
             StringBuilder prompt = new StringBuilder();
             prompt.append("你是企业资产管理系统的智能审批助手，请根据以下资产申请单给出审批建议。\n");
-            prompt.append("要求：先给结论（建议通过 / 建议拒绝），再给出简短理由（最多3条），控制在120字以内，使用中文。\n");
+            prompt.append("要求：先给结论（建议通过 / 建议拒绝），再给出理由（最多3条），控制在120字以内，使用中文。\n");
             prompt.append("申请单号：").append(nullToEmpty(application.getApplicationNo())).append("\n");
             prompt.append("申请人：").append(nullToEmpty(employeeName))
                     .append("（部门：").append(nullToEmpty(department)).append("）\n");
@@ -93,7 +93,10 @@ public class AiServiceImpl implements AiService {
             prompt.append("申请数量：").append(application.getQuantity() == null ? "未填写" : application.getQuantity()).append("\n");
             prompt.append("申请原因：").append(nullToEmpty(application.getReason())).append("\n");
 
-            String content = chatClient.prompt().user(prompt.toString()).call().content();
+            String content = chatClient.prompt()
+                    .user(prompt.toString())
+                    .call()
+                    .content();
             return content == null || content.isBlank() ? "模型未返回内容，请人工审批" : content.trim();
         } catch (Exception e) {
             log.error("智能审批建议调用失败, applicationId={}", application.getId(), e);
@@ -129,14 +132,18 @@ public class AiServiceImpl implements AiService {
             prompt.append("- code：资产编号关键字（字符串，用户提到编号时给出）\n");
             prompt.append("- categoryId：资产分类 id（数字，仅当用户描述的资产类别与下方分类映射匹配时给出）\n");
             prompt.append("- status：资产状态（数字：1在库、2已领用、3维修中、4报废，用户明确提到状态时给出）\n");
+            prompt.append("- price：资产价值（数字，用户明确提到价值时给出）\n");
             if (categoryHint.length() > 0) {
                 prompt.append(categoryHint);
             }
             prompt.append("用户查询：").append(keyword).append("\n");
             prompt.append("要求：只输出 JSON 对象，不要输出任何其他文字或解释。如果没有任何可提取条件，输出 {}");
 
-            String content = chatClient.prompt().user(prompt.toString()).call().content();
-            JsonNode node = parseJson(content);
+            String content = chatClient.prompt()
+                    .user(prompt.toString())
+                    .call()
+                    .content();
+            JsonNode node = parseJson(content);  // 把模型输出的内容,转为纯 JSON 对象
             if (node == null || node.isEmpty()) {
                 return result;
             }
@@ -153,6 +160,9 @@ public class AiServiceImpl implements AiService {
             }
             if (node.hasNonNull("status") && node.get("status").canConvertToInt()) {
                 dto.setStatus(node.get("status").asInt());
+            }
+            if (node.hasNonNull("price") && node.get("price").canConvertToInt()) {
+                dto.setPrice(node.get("price").asInt());
             }
             dto.setPage(1);
             dto.setPageSize(20);
@@ -188,7 +198,7 @@ public class AiServiceImpl implements AiService {
                     .user(u -> u.text(prompt).media(new Media(mimeTypeOf(imageUrl), URI.create(imageUrl))))
                     .call()
                     .content();
-            JsonNode node = parseJson(content);
+            JsonNode node = parseJson(content); // 把模型输出的内容,转为纯 JSON 对象
             if (node == null) {
                 result.put("error", "模型未返回有效识别结果");
                 result.put("raw", content);

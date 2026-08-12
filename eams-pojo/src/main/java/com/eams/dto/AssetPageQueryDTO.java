@@ -24,4 +24,7 @@ public class AssetPageQueryDTO implements Serializable {
 
     /** 状态 */
     private Integer status;
+
+    /** 价格 */
+    private Integer price;
 }

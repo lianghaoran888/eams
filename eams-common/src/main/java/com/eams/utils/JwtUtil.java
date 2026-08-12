@@ -15,6 +15,9 @@ import java.util.Map;
  */
 public class JwtUtil {
 
+    /**
+     * 生成密钥
+     */
     private static SecretKey getKey(String secretKey) {
         return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
     }

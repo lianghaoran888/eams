@@ -41,8 +41,7 @@ public class AssetServiceImpl implements AssetService {
         BeanUtils.copyProperties(assetDTO, asset);
 
         if (asset.getCode() == null || asset.getCode().isEmpty()) {
-            asset.setCode("ZC" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
-                    + (int) (Math.random() * 900 + 100));
+            asset.setCode("ZC" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHH")));
         }
         if (asset.getStatus() == null) {
             asset.setStatus(Asset.IN_STOCK);

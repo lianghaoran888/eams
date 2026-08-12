@@ -48,8 +48,7 @@ public class RepairServiceImpl implements RepairService {
     @Override
     @Transactional
     public void submit(RepairRecordDTO repairRecordDTO) {
-        AssetApplication application = repairRecordDTO.getApplicationId() == null
-                ? null : assetApplicationMapper.getById(repairRecordDTO.getApplicationId());
+        AssetApplication application = repairRecordDTO.getApplicationId() == null ? null : assetApplicationMapper.getById(repairRecordDTO.getApplicationId());
         Asset asset = repairRecordDTO.getAssetId() == null ? null : assetMapper.getById(repairRecordDTO.getAssetId());
         if (application == null) {
             throw new BaseException(MessageConstant.APPLICATION_NOT_FOUND);
